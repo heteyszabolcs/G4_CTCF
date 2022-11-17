@@ -12,6 +12,9 @@ suppressPackageStartupMessages({
   library("Mus.musculus")
 })
 
+# annotation function
+source("C:/Szabolcs/Karolinska/Data/scripts/annotation.R")
+
 # add result folder
 result_folder = "../results/hi-c/"
 
@@ -191,5 +194,41 @@ write_tsv(tmpyp4_tad, glue("{result_folder}TMPyP4_200kb_TAD_annots.tsv"))
 print("Working on TMPyP4_only_200kb")
 tmpyp4_only_tad = annotate_intratad(tmpyp4_only_tad)
 write_tsv(tmpyp4_only_tad, glue("{result_folder}TMPyP4_only_200kb_TAD_annots.tsv"))
+
+# annotate TAD boundaries ( = boundaries of TAD domains)
+annotate_boundaries = function(path_to_boundary, output_name) {
+  boundaries = fread(path_to_boundary)
+  colnames(boundaries)
+  boundaries = mm10_annotation(
+    regions = boundaries,
+    seqname_col = "seqnames",
+    start_col = "start",
+    end_col = "end",
+    feature_1 = "log2_insulation_score_200000",
+    feature_2 = "log2_insulation_score_200000"
+  )
+  
+  boundaries = boundaries %>% dplyr::select(
+    seqnames,
+    start,
+    end,
+    log2_insulation_score = feature_1,
+    gene_symbol = SYMBOL,
+    distanceToTSS,
+    annotation
+  )
+  
+  write_tsv(boundaries, glue("{result_folder}{output_name}"))
+  
+  return(boundaries)
+}
+
+tad_boundaries = list.files(bed, pattern = "*._200kb.bed", full.names = TRUE)
+
+annotate_boundaries("../data/Hi-C/bed/NT_only_fastq_merge_200kb.bed", 
+                    output_name = "NT_only_fastq_merge_200kb_annot.tsv")
+annotate_boundaries("../data/Hi-C/bed/TMPyP4_only_fastq_merge_200kb.bed", 
+                    output_name = "TMPyP4_only_fastq_merge_200kb_annot.tsv")
+
 
 

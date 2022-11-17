@@ -35,7 +35,7 @@ overlap = function(peak_set1, peak_set2, extend = TRUE) {
                     peak_set2,
                     type = "any",
                     ignore.strand = FALSE)
-  ol = only_bulk = peak_set1[queryHits(ol)]
+  ol = peak_set1[queryHits(ol)]
   ol = as.data.frame(ol)
   ol = ol[, 1:3]
   

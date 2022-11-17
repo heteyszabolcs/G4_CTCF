@@ -5,18 +5,31 @@ suppressPackageStartupMessages({
   library("ggplot2")
   library("glue")
   library("cowplot")
+  library("ggpubr")
+  library("ComplexHeatmap")
+  library("circlize")
+  library("matrixStats")
 })
 
+set.seed(42)
+
+# result folder
 result_folder = "../results/hi-c/"
 
+# hi-c data
 tad_annot = "../results/hi-c/"
 tad_annot = list.files(tad_annot, pattern = 'TAD_annots.tsv', full.names = TRUE)
+boundary_annot = "../results/hi-c/"
+boundary_annot = list.files(boundary_annot, pattern = '*200kb_annot.tsv', full.names = TRUE)
 
 tad = "../data/Hi-C/bed/"
 tad = list.files(tad, pattern = "bed", full.names = TRUE)
 
+# RNA-Seq data
 deseq2 = "../results/rna_seq_deseq2/reg_log_norm_counts.tsv"
+vst = "../results/rna_seq_deseq2/vst_norm_counts.tsv"
 deseq2 = fread(deseq2)
+vst = fread(vst)
 
 fc = fread("../results/rna_seq_deseq2/RNA-Seq_treat_vs_contr_DESeq2_fc.tsv")
 sign = fc %>% filter(abs(log2FoldChange) > 0.5) %>% pull(gene_name)
@@ -25,7 +38,6 @@ sign = fc %>% filter(abs(log2FoldChange) > 0.5) %>% pull(gene_name)
 add_expr_feature = function(tad_annot, tad, expression) {
   bed1 = fread(tad_annot)
   bed2 = fread(tad)
-  
   
   bed1 = bed1 %>% mutate(
     starts = as.character(starts),
@@ -625,7 +637,7 @@ TMPyP4_only_plot4 = ggplot(TMPyP4_only_fc %>% arrange(diff.expressed), aes(x = l
   )
 TMPyP4_only_plot4
 
-## sum up
+## grid of scatter plots
 plot_grid(common_plot, nt_plot, nt_only_plot, TMPyP4_plot, TMPyP4_only_plot)
 
 ggsave(
@@ -673,3 +685,203 @@ ggsave(
   height = 8,
   dpi = 500,
 )
+
+# examine expression levels of genes close (+/- 100 kb) to TAD boundaries
+nt_boundaries = fread("../results/hi-c/NT_only_fastq_merge_200kb_annot.tsv")
+nt_boundaries = nt_boundaries %>% dplyr::filter(abs(distanceToTSS) < 100000) %>%
+  inner_join(., deseq2, by = c("gene_symbol" = "gene_symbol")) %>%
+  dplyr::select(gene_symbol, "non-treated, rep 1" = NT_1, "non-treated, rep 2" = NT_2, 
+                "TMPyP4, rep 1" = TMPyP4_1, "TMPyP4, rep 2" = TMPyP4_2,
+                log2_insulation_score) %>%
+  pivot_longer("non-treated, rep 1":"TMPyP4, rep 2", names_to = "condition", values_to = "norm_expr") %>% 
+  mutate(hic_sample = "non-treated only") %>% 
+  dplyr::select(log2_insulation_score, norm_expr, condition, hic_sample)
+
+# create heatmaps for non-treated only and TMPyP4 only boundaries
+
+create_heatmaps = function(path_to_boundaries,
+                                     output_name) {
+  
+  boundaries = fread(path_to_boundaries)
+  hm = boundaries %>% dplyr::filter(abs(distanceToTSS) < 100000) %>%
+    inner_join(., vst, by = c("gene_symbol" = "gene_symbol")) %>%
+    dplyr::select("gene_symbol", "non-treated, rep 1" = NT_1, "non-treated, rep 2" = NT_2, 
+                  "TMPyP4, rep 1" = TMPyP4_1, "TMPyP4, rep 2" = TMPyP4_2)
+  rows = hm %>% pull(gene_symbol)
+  hm = as.matrix(hm[,2:5])
+  rownames(hm) = rows
+  hm = cbind(hm, rowVars(hm))
+  colnames(hm)[5] <- "variance"
+  hm = hm[order(hm[,5], decreasing = TRUE),][1:50,]
+  hm = hm[,1:4]
+  most_variable_set = rownames(hm) # top variable genes
+  
+  col_fun = colorRamp2(c(0, 7.5, 15), c("#440154", "#21918c", "#fde725"))
+  norm_hm = Heatmap(
+    hm,
+    column_title = " ",
+    row_title = "genes close to boundaries (+/- 100 kbp)",
+    name = "norm. expr.",
+    clustering_method_rows = "complete",
+    clustering_method_columns = "complete",
+    col = col_fun,
+    rect_gp = gpar(col = "black", lwd = 0.1),
+    show_column_dend = FALSE,
+    cluster_columns = TRUE,
+    cluster_rows = TRUE,
+    show_row_dend = TRUE,
+    heatmap_width = unit(4, "cm"),
+    heatmap_height = unit(12, "cm"),
+    show_row_names = FALSE,
+    column_names_gp = gpar(fontsize = 7),
+    row_names_gp = gpar(fontsize = 4),
+    column_names_rot = 90
+  )
+  
+  # fold change heatmap
+  hm_fc = boundaries %>% dplyr::filter(abs(distanceToTSS) < 100000) %>%
+    left_join(., fc, by = c("gene_symbol" = "gene_name")) %>%
+    dplyr::filter(gene_symbol %in% most_variable_set) %>% 
+    dplyr::select(gene_symbol, log2FoldChange) 
+  hm_fc[is.na(hm_fc)] = 0
+  rows_hm_fc = hm_fc$gene_symbol
+  hm_fc = as.matrix(hm_fc[,2])
+  rownames(hm_fc) = rows_hm_fc
+  
+  col_fun_fc = colorRamp2(c(-0.5, 0, 0.5), c("#636363", "#f0f0f0", "#feb24c"))
+  hm_fc = Heatmap(
+    hm_fc,
+    column_title = "",
+    row_title = "",
+    name = "log2FC",
+    clustering_method_rows = "complete",
+    clustering_method_columns = "complete",
+    col = col_fun_fc,
+    rect_gp = gpar(col = "black", lwd = 0.1),
+    show_column_dend = FALSE,
+    cluster_columns = FALSE,
+    cluster_rows = FALSE,
+    show_row_dend = FALSE,
+    heatmap_width = unit(0.5, "cm"),
+    heatmap_height = unit(12, "cm"),
+    show_row_names = FALSE,
+    column_names_gp = gpar(fontsize = 7),
+    row_names_gp = gpar(fontsize = 4),
+    column_names_rot = 90,
+  )
+  
+  # ins score heatmap
+  hm_ins = boundaries %>% dplyr::filter(abs(distanceToTSS) < 100000) %>%
+    left_join(., fc, by = c("gene_symbol" = "gene_name")) %>%
+    dplyr::filter(gene_symbol %in% most_variable_set) %>% 
+    dplyr::select(gene_symbol, log2_insulation_score) 
+  hm_ins[is.na(hm_ins)] = 0
+  rows_hm_ins = hm_ins$gene_symbol
+  hm_ins = as.matrix(hm_ins[,2])
+  rownames(hm_ins) = rows_hm_ins
+  
+  col_fun_ins = colorRamp2(c(0, -0.5, -1), c("#04040d", "#ad3d78", "#f8f5b6"))
+  hm_ins = Heatmap(
+    hm_ins,
+    column_title = "",
+    row_title = "",
+    name = "log2InsScore",
+    clustering_method_rows = "complete",
+    clustering_method_columns = "complete",
+    col = col_fun_ins,
+    rect_gp = gpar(col = "black", lwd = 0.1),
+    show_column_dend = FALSE,
+    cluster_columns = FALSE,
+    cluster_rows = FALSE,
+    show_row_dend = FALSE,
+    heatmap_width = unit(2, "cm"),
+    heatmap_height = unit(12, "cm"),
+    show_row_names = TRUE,
+    column_names_gp = gpar(fontsize = 7),
+    row_names_gp = gpar(fontsize = 4),
+    column_names_rot = 90,
+  )
+  
+  hm_list = norm_hm + hm_fc + hm_ins
+  pdf(
+    file = glue("{result_folder}{output_name}"),
+    width = 4,
+    height = 5.5
+  )
+  suppressWarnings(draw(hm_list, auto_adjust = FALSE))
+  dev.off()
+  
+}
+
+# run the heatmap function on boundaries
+create_heatmaps(path_to_boundaries = "../results/hi-c/NT_only_fastq_merge_200kb_annot.tsv",
+                output_name = "NT_only_heatmaps.pdf")
+create_heatmaps(path_to_boundaries = "../results/hi-c/TMPyP4_only_fastq_merge_200kb_annot.tsv",
+                output_name = "TMPyP4_only_heatmaps.pdf")
+create_heatmaps(path_to_boundaries = "../results/hi-c/common_fastq_merge_200kb_annot.tsv",
+                output_name = "common_heatmaps.pdf")
+
+
+tmpyp4_boundaries = fread("../results/hi-c/TMPyP4_only_fastq_merge_200kb_annot.tsv")
+tmpyp4_boundaries = tmpyp4_boundaries %>% dplyr::filter(abs(distanceToTSS) < 100000) %>%
+  inner_join(., deseq2, by = c("gene_symbol" = "gene_symbol")) %>%
+  dplyr::select(gene_symbol, "non-treated, rep 1" = NT_1, "non-treated, rep 2" = NT_2,
+                "TMPyP4, rep 1" = TMPyP4_1, "TMPyP4, rep 2" = TMPyP4_2, log2_insulation_score) %>%
+  pivot_longer("non-treated, rep 1":"TMPyP4, rep 2", names_to = "condition", values_to = "norm_expr") %>% 
+  mutate(hic_sample = "TMPyP4 only") %>% 
+  dplyr::select(log2_insulation_score, norm_expr, condition, hic_sample)
+
+
+# violin plot of expression of genes close to TAD boundaries
+vis = rbind(nt_boundaries, tmpyp4_boundaries)
+  
+comparisons = list(
+  c("non-treated, rep 1", "TMPyP4, rep 1"),
+  c("non-treated, rep 2", "TMPyP4, rep 2")
+)
+ggplot(vis,
+       aes(x = condition, y = norm_expr, fill = hic_sample)) +
+  geom_violin(trim = TRUE, color = "black") +
+  scale_fill_manual(values = c("#a6bddb", "#fc9272")) +
+  labs(title = "genes close to TAD boundaries (+/- 100 kb)",
+       x = "RNA-Seq",
+       y = "DESeq2 norm. expr.",
+       fill = "TAD boundary") +
+  ylim(0, 30) +
+  theme_classic() +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(size = 15, face = "bold"),
+    axis.text.x = element_text(
+      size = 15,
+      color = "black",
+      angle = 45,
+      hjust = 1,
+      colour = "black"
+    ),
+    axis.text.y = element_text(size = 13, color = "black")
+  ) + stat_compare_means(comparisons = comparisons, label = "p.signif") +
+  stat_compare_means(label.y = 20, label.x = 2.5, label.sep = "\n", size = 3)
+
+
+ggsave(
+  glue("{result_folder}TAD_boundary_expr_violins_exp.pdf"),
+  plot = last_plot(),
+  width = 7,
+  height = 5,
+  device = "pdf"
+)
+
+ggsave(
+  glue("{result_folder}TAD_boundary_expr_violins_exp.png"),
+  plot = last_plot(),
+  width = 7,
+  height = 5,
+  dpi = 300
+)
+
+
+
+
+
+                                   

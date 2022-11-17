@@ -29,8 +29,8 @@ plotHeatmap -m ../results/deeptools/matrix_ctcf_sr_NT_only.mat.gz \
  --heatmapHeight 14 \
  --colorMap "YlOrRd" \
  --yMin 0 \
- --yMax 100 \
- --zMax 100 \
+ --yMax 20 \
+ --zMax 20 \
  -z "TMPyP4 only boundaries" \
  --yAxisLabel "" \
  --xAxisLabel "" \
@@ -42,8 +42,8 @@ plotHeatmap -m ../results/deeptools/matrix_ctcf_sr_NT_only.mat.gz \
  --heatmapHeight 14 \
  --colorMap "YlOrRd" \
  --yMin 0 \
- --yMax 100 \
- --zMax 100 \
+ --yMax 20 \
+ --zMax 20 \
  -z "TMPyP4 only boundaries" \
  --yAxisLabel "" \
  --xAxisLabel "" \
