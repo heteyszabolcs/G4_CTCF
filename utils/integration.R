@@ -9,6 +9,7 @@ suppressPackageStartupMessages({
   library("ComplexHeatmap")
   library("circlize")
   library("matrixStats")
+  library("ggpubr")
 })
 
 set.seed(42)
@@ -32,7 +33,7 @@ deseq2 = fread(deseq2)
 vst = fread(vst)
 
 fc = fread("../results/rna_seq_deseq2/RNA-Seq_treat_vs_contr_DESeq2_fc.tsv")
-sign = fc %>% filter(abs(log2FoldChange) > 0.5) %>% pull(gene_name)
+sign = fc %>% filter(abs(log2FoldChange) > 0.25) %>% pull(gene_name)
 
 # function: join together the two TAD data frames and assigns DESeq2 norm. expression levels to the annotated genes
 add_expr_feature = function(tad_annot, tad, expression) {
@@ -111,27 +112,44 @@ common_plot = ggplot(common_long, aes(x = NT_1, y = log2_ins_score)) +
   )
 common_plot
 
-# highlight genes with higher than abs(0.5) DESeq2 fold change
-common_long = common_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "1", "0"),
-                                     alpha_value = ifelse(gene_symbol %in% sign, 1, 0.01))
+# highlight genes with higher than abs(0.25) DESeq2 fold change
+common_long = common_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "altered", "unaltered"))
 
-common_plot2 = ggplot(common_long %>% arrange(diff.expressed), aes(x = NT_1, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = diff.expressed, alpha = alpha_value)) +
-  scale_color_manual(values = c("#f0f0f0", "#f03b20")) +
+common_plot2 = ggplot(common_long, aes(x = NT_1, y = log2_ins_score)) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = diff.expressed)
+  ) +
+  scale_fill_manual(values = c("#fc9272", "#f0f0f0"), 
+                    labels = c("altered", "unaltered")) +
+  geom_point(
+    aes(fill = diff.expressed),
+    size = 2,
+    shape = 21,
+    colour = "black",
+    data = subset(common_long, diff.expressed == "altered")
+  ) +
   labs(
     title = "common TAD boundaries",
     x = "DESeq2 norm. expr.",
-    y = "log2 insulation score",
-    color = " "
+    y = "log2InsScore",
+    fill = "closest gene"
   ) +
   ylim(-5, 2) +
-  guides(colour = guide_legend("diff. expr."), alpha = "none") +
+  scale_x_continuous(breaks = c(seq(0, 20, 2)),       
+                     limits = c(0, 20)) +
+  guides(color = guide_legend(override.aes = list(fill = 5))) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
   )
 common_plot2
 
@@ -148,24 +166,35 @@ common_fc = pivot_longer(
 )
 
 common_plot3 = ggplot(common_fc, aes(x = log2FoldChange, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = ins_score_type)) +
-  # geom_point(fill = "black", size = 7, shape = 1) +
-  scale_color_manual(values = c("#fdbb84", "#a6bddb")) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = ins_score_type)
+  ) +
+  scale_fill_manual(values = c("#f0f0f0", "#fc9272"), labels = c("end", "start")) +
+  scale_color_manual(values = "black") +
   labs(
     title = "common TAD boundaries",
     x = "DESeq2 log2 fold change.",
     y = "log2 insulation score",
-    color = " "
+    fill = "TAD position"
   ) +
+  scale_x_continuous(breaks = c(seq(-1.5, 1.5, 0.5)),       
+                     limits = c(-1.5, 1.5)) +
   ylim(-5, 2) +
-  xlim(-1.5, 1.5) +
+  guides(alpha = FALSE, size = FALSE, fill = guide_legend(override.aes = list(size = 5), reverse = TRUE)) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
-  )
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
+  ) +
+  stat_cor(method = "pearson", label.x = -1.5, label.y = 2, size = 6)
 common_plot3
 
 common_fc = common_fc %>% mutate(diff.expressed = ifelse(padj < 0.05, "1", "0"),
@@ -225,26 +254,43 @@ nt_plot = ggplot(nt_long, aes(x = NT_1, y = log2_ins_score)) +
   )
 nt_plot
 
-nt_long = nt_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "1", "0"),
-                                     alpha_value = ifelse(gene_symbol %in% sign, 1, 0.01))
+nt_long = nt_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "altered", "unaltered"))
 
-nt_plot2 = ggplot(nt_long %>% arrange(diff.expressed), aes(x = NT_1, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = diff.expressed, alpha = alpha_value)) +
-  scale_color_manual(values = c("#f0f0f0", "#f03b20")) +
+nt_plot2 = ggplot(nt_long, aes(x = NT_1, y = log2_ins_score)) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = diff.expressed)
+  ) +
+  scale_fill_manual(values = c("#fc9272", "#f0f0f0"), 
+                    labels = c("altered", "unaltered")) +
+  geom_point(
+    aes(fill = diff.expressed),
+    size = 2,
+    shape = 21,
+    colour = "black",
+    data = subset(common_long, diff.expressed == "altered")
+  ) +
   labs(
     title = "non-treated TAD boundaries",
     x = "DESeq2 norm. expr.",
-    y = "log2 insulation score",
-    color = " "
+    y = "log2InsScore",
+    fill = "closest gene"
   ) +
   ylim(-5, 2) +
-  guides(colour = guide_legend("diff. expr."), alpha = "none") +
+  scale_x_continuous(breaks = c(seq(0, 20, 2)),       
+                     limits = c(0, 20)) +
+  guides(color = guide_legend(override.aes = list(fill = 5))) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
   )
 nt_plot2
 
@@ -261,24 +307,34 @@ nt_fc = pivot_longer(
 )
 
 nt_plot3 = ggplot(nt_fc, aes(x = log2FoldChange, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = ins_score_type)) +
-  # geom_point(fill = "black", size = 7, shape = 1) +
-  scale_color_manual(values = c("#fdbb84", "#a6bddb")) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = ins_score_type)
+  ) +
+  scale_fill_manual(values = c("#f0f0f0", "#fc9272"), labels = c("end", "start")) +
   labs(
     title = "non-treated TAD boundaries",
     x = "DESeq2 log2 fold change.",
     y = "log2 insulation score",
-    color = " "
+    fill = "TAD position"
   ) +
+  scale_x_continuous(breaks = c(seq(-1.5, 1.5, 0.5)),       
+                     limits = c(-1.5, 1.5)) +
   ylim(-5, 2) +
-  xlim(-1.5, 1.5) +
+  guides(alpha = FALSE, size = FALSE, fill = guide_legend(override.aes = list(size = 5), reverse = TRUE)) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
-  )
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
+  ) +
+  stat_cor(method = "pearson", label.x = -1.5, label.y = 2, size = 6)
 nt_plot3
 
 nt_fc = nt_fc %>% mutate(diff.expressed = ifelse(padj < 0.05, "1", "0"),
@@ -337,26 +393,43 @@ nt_only_plot = ggplot(nt_only_long, aes(x = NT_1, y = log2_ins_score)) +
   )
 nt_only_plot
 
-nt_only_long = nt_only_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "1", "0"),
-                             alpha_value = ifelse(gene_symbol %in% sign, 1, 0.01))
+nt_only_long = nt_only_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "altered", "unaltered"))
 
-nt_only_plot2 = ggplot(nt_only_long %>% arrange(diff.expressed), aes(x = NT_1, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = diff.expressed, alpha = alpha_value)) +
-  scale_color_manual(values = c("#f0f0f0", "#f03b20")) +
+nt_only_plot2 = ggplot(nt_only_long, aes(x = NT_1, y = log2_ins_score)) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = diff.expressed)
+  ) +
+  scale_fill_manual(values = c("#fc9272", "#f0f0f0"), 
+                    labels = c("altered", "unaltered")) +
+  geom_point(
+    aes(fill = diff.expressed),
+    size = 2,
+    shape = 21,
+    colour = "black",
+    data = subset(common_long, diff.expressed == "altered")
+  ) +
   labs(
     title = "non-treated only TAD boundaries",
     x = "DESeq2 norm. expr.",
-    y = "log2 insulation score",
-    color = " "
+    y = "log2InsScore",
+    fill = "closest gene"
   ) +
   ylim(-5, 2) +
-  guides(colour = guide_legend("diff. expr."), alpha = "none") +
+  scale_x_continuous(breaks = c(seq(0, 20, 2)),       
+                     limits = c(0, 20)) +
+  guides(color = guide_legend(override.aes = list(fill = 5))) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
   )
 nt_only_plot2
 
@@ -372,24 +445,34 @@ nt_only_fc = pivot_longer(
 )
 
 nt_only_plot3 = ggplot(nt_only_fc, aes(x = log2FoldChange, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = ins_score_type)) +
-  # geom_point(fill = "black", size = 7, shape = 1) +
-  scale_color_manual(values = c("#fdbb84", "#a6bddb")) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = ins_score_type)
+  ) +
+  scale_fill_manual(values = c("#f0f0f0", "#fc9272"), labels = c("end", "start")) +
   labs(
-    title = "non-treated TAD boundaries",
+    title = "non-treated only TAD boundaries",
     x = "DESeq2 log2 fold change.",
     y = "log2 insulation score",
-    color = " "
+    fill = "TAD position"
   ) +
+  scale_x_continuous(breaks = c(seq(-1.5, 1.5, 0.5)),       
+                     limits = c(-1.5, 1.5)) +
   ylim(-5, 2) +
-  xlim(-1.5, 1.5) +
+  guides(alpha = FALSE, size = FALSE, fill = guide_legend(override.aes = list(size = 5), reverse = TRUE)) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
-  )
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
+  ) +
+  stat_cor(method = "pearson", label.x = -1.5, label.y = 2, size = 6)
 nt_only_plot3
 
 nt_only_fc = nt_only_fc %>% mutate(diff.expressed = ifelse(padj < 0.05, "1", "0"),
@@ -448,26 +531,43 @@ TMPyP4_plot = ggplot(TMPyP4_long, aes(x = NT_1, y = log2_ins_score)) +
   )
 TMPyP4_plot
 
-TMPyP4_long = TMPyP4_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "1", "0"),
-                                       alpha_value = ifelse(gene_symbol %in% sign, 1, 0.01))
+TMPyP4_long = TMPyP4_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "altered", "unaltered"))
 
-TMPyP4_plot2 = ggplot(TMPyP4_long %>% arrange(diff.expressed), aes(x = NT_1, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = diff.expressed, alpha = alpha_value)) +
-  scale_color_manual(values = c("#f0f0f0", "#f03b20")) +
+TMPyP4_plot2 = ggplot(TMPyP4_long, aes(x = NT_1, y = log2_ins_score)) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = diff.expressed)
+  ) +
+  scale_fill_manual(values = c("#fc9272", "#f0f0f0"), 
+                    labels = c("altered", "unaltered")) +
+  geom_point(
+    aes(fill = diff.expressed),
+    size = 2,
+    shape = 21,
+    colour = "black",
+    data = subset(common_long, diff.expressed == "altered")
+  ) +
   labs(
-    title = "TMPyP4-treated TAD boundaries",
+    title = "TMPyP4 TAD boundaries",
     x = "DESeq2 norm. expr.",
-    y = "log2 insulation score",
-    color = " "
+    y = "log2InsScore",
+    fill = "closest gene"
   ) +
   ylim(-5, 2) +
-  guides(colour = guide_legend("diff. expr."), alpha = "none") +
+  scale_x_continuous(breaks = c(seq(0, 20, 2)),       
+                     limits = c(0, 20)) +
+  guides(color = guide_legend(override.aes = list(fill = 5))) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
   )
 TMPyP4_plot2
 
@@ -483,24 +583,34 @@ TMPyP4_fc = pivot_longer(
 )
 
 TMPyP4_plot3 = ggplot(TMPyP4_fc, aes(x = log2FoldChange, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = ins_score_type)) +
-  # geom_point(fill = "black", size = 7, shape = 1) +
-  scale_color_manual(values = c("#fdbb84", "#a6bddb")) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = ins_score_type)
+  ) +
+  scale_fill_manual(values = c("#f0f0f0", "#fc9272"), labels = c("end", "start")) +
   labs(
-    title = "TMPyP4-treated TAD boundaries",
+    title = "TMPyP4 TAD boundaries",
     x = "DESeq2 log2 fold change.",
     y = "log2 insulation score",
-    color = " "
+    fill = "TAD position"
   ) +
+  scale_x_continuous(breaks = c(seq(-1.5, 1.5, 0.5)),       
+                     limits = c(-1.5, 1.5)) +
   ylim(-5, 2) +
-  xlim(-1.5, 1.5) +
+  guides(alpha = FALSE, size = FALSE, fill = guide_legend(override.aes = list(size = 5), reverse = TRUE)) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
-  )
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
+  ) +
+  stat_cor(method = "pearson", label.x = -1.5, label.y = 2, size = 6)
 TMPyP4_plot3
 
 TMPyP4_fc = TMPyP4_fc %>% mutate(diff.expressed = ifelse(padj < 0.05, "1", "0"),
@@ -559,26 +669,43 @@ TMPyP4_only_plot = ggplot(TMPyP4_only_long, aes(x = NT_1, y = log2_ins_score)) +
   )
 TMPyP4_only_plot
 
-TMPyP4_only_long = TMPyP4_only_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "1", "0"),
-                                     alpha_value = ifelse(gene_symbol %in% sign, 1, 0.01))
+TMPyP4_only_long = TMPyP4_only_long %>% mutate(diff.expressed = ifelse(gene_symbol %in% sign, "altered", "unaltered")) 
 
-TMPyP4_only_plot2 = ggplot(TMPyP4_only_long %>% arrange(diff.expressed), aes(x = NT_1, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = diff.expressed, alpha = alpha_value)) +
-  scale_color_manual(values = c("#f0f0f0", "#f03b20")) +
+TMPyP4_only_plot2 = ggplot(TMPyP4_only_long, aes(x = NT_1, y = log2_ins_score)) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = diff.expressed)
+  ) +
+  scale_fill_manual(values = c("#fc9272", "#f0f0f0"), 
+                    labels = c("altered", "unaltered")) +
+  geom_point(
+    aes(fill = diff.expressed),
+    size = 2,
+    shape = 21,
+    colour = "black",
+    data = subset(common_long, diff.expressed == "altered")
+  ) +
   labs(
-    title = "TMPyP4-treated only TAD boundaries",
+    title = "TMPyP4 only TAD boundaries",
     x = "DESeq2 norm. expr.",
-    y = "log2 insulation score",
-    color = " "
+    y = "log2InsScore",
+    fill = "closest gene"
   ) +
   ylim(-5, 2) +
-  guides(colour = guide_legend("diff. expr."), alpha = "none") +
+  scale_x_continuous(breaks = c(seq(0, 20, 2)),       
+                     limits = c(0, 20)) +
+  guides(color = guide_legend(override.aes = list(fill = 5))) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
   )
 TMPyP4_only_plot2
 
@@ -594,24 +721,34 @@ TMPyP4_only_fc = pivot_longer(
 )
 
 TMPyP4_only_plot3 = ggplot(TMPyP4_only_fc, aes(x = log2FoldChange, y = log2_ins_score)) +
-  geom_point(size = 2, aes(colour = ins_score_type)) +
-  # geom_point(fill = "black", size = 7, shape = 1) +
-  scale_color_manual(values = c("#fdbb84", "#a6bddb")) +
+  ggrastr::geom_point_rast(
+    size = 2,
+    shape = 21,
+    colour = "black",
+    aes(fill = ins_score_type)
+  ) +
+  scale_fill_manual(values = c("#f0f0f0", "#fc9272"), labels = c("end", "start")) +
   labs(
-    title = "TMPyP4-treated only TAD boundaries",
+    title = "TMPyP4 only TAD boundaries",
     x = "DESeq2 log2 fold change.",
     y = "log2 insulation score",
-    color = " "
+    fill = "TAD position"
   ) +
+  scale_x_continuous(breaks = c(seq(-1.5, 1.5, 0.5)),       
+                     limits = c(-1.5, 1.5)) +
   ylim(-5, 2) +
-  xlim(-1.5, 1.5) +
+  guides(alpha = FALSE, size = FALSE, fill = guide_legend(override.aes = list(size = 5), reverse = TRUE)) +
   theme_classic() +
   theme(
-    text = element_text(size = 6),
-    plot.title = element_text(size = 12),
-    axis.text.x = element_text(size = 7, color = "black"),
-    axis.text.y = element_text(size = 7, color = "black")
-  )
+    text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 20, color = "black"),
+    axis.title.y = element_text(size = 20, color = "black")
+  ) +
+  stat_cor(method = "pearson", label.x = -1.5, label.y = 2, size = 6)
 TMPyP4_only_plot3
 
 TMPyP4_only_fc = TMPyP4_only_fc %>% mutate(diff.expressed = ifelse(padj < 0.05, "1", "0"),
@@ -657,10 +794,20 @@ ggsave(
     "{result_folder}TAD_bound_vs_expr-w_diff_genes.png"
   ),
   plot = last_plot(),
-  width = 10,
+  width = 15,
   height = 8,
   dpi = 500,
 )
+
+ggsave(
+  glue(
+    "{result_folder}TAD_bound_vs_expr-w_diff_genes.pdf"
+  ),
+  plot = last_plot(),
+  width = 15,
+  height = 8
+)
+
 
 plot_grid(common_plot3, nt_plot3, nt_only_plot3, TMPyP4_plot3, TMPyP4_only_plot3)
 
@@ -669,9 +816,18 @@ ggsave(
     "{result_folder}TAD_bound_vs_foldchanges.png"
   ),
   plot = last_plot(),
-  width = 10,
+  width = 15,
   height = 8,
   dpi = 500,
+)
+
+ggsave(
+  glue(
+    "{result_folder}TAD_bound_vs_foldchanges.pdf"
+  ),
+  plot = last_plot(),
+  width = 15,
+  height = 8
 )
 
 plot_grid(common_plot4, nt_plot4, nt_only_plot4, TMPyP4_plot4, TMPyP4_only_plot4)
