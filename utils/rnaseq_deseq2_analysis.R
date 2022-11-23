@@ -97,14 +97,16 @@ attributes = listAttributes(ensembl)
 location = getBM(
   attributes = c(
     'mgi_symbol',
-    "chromosome_name","start_position", "end_position"
+    "chromosome_name","start_position", "end_position", "strand"
   ),
   mart = ensembl,
   filters = 'mgi_symbol',
   values = res0.25_p0.05$gene_name
 )
 bed = location %>% mutate(seqname = paste0("chr", as.character(chromosome_name))) %>% 
-  dplyr::select(seqname, start_position, end_position)
+  mutate(gene_symbol = ".", score = "0") %>% 
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>% 
+  mutate(strand = ifelse(strand == -1, "-", "+"))
 write_tsv(bed, glue("{result_folder}RNA-Seq_treat_vs_contr_fc0.25_p0.05.bed"), col_names = FALSE)
 
 # group genes based on rlog norm
@@ -127,7 +129,7 @@ aggr = rlog_counts_t %>%
 aggr_with_loc = getBM(
   attributes = c(
     'mgi_symbol',
-    "chromosome_name","start_position", "end_position"
+    "chromosome_name","start_position", "end_position", "strand"
   ),
   mart = ensembl,
   filters = 'mgi_symbol',
@@ -135,29 +137,35 @@ aggr_with_loc = getBM(
 )
 aggr_bed = aggr_with_loc %>% inner_join(., aggr, by = c("mgi_symbol" = "gene_symbol")) %>% 
   mutate(seqname = paste0("chr", as.character(chromosome_name))) %>% 
-  dplyr::select(seqname, start_position, end_position, group) 
+  mutate(gene_symbol = ".", score = "0") %>% 
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand, group) 
   #mutate(promoter = start_position - 3000) %>% # extend to promoter regions
   #dplyr::select(seqname, start_position, end_position, group)
 
 # write grouped genes into bed files
 aggr_bed %>% dplyr::filter(group == "high") %>%
-  dplyr::select(seqname, start_position, end_position) %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(., glue("{result_folder}NT_high.bed"), col_names = FALSE)
 aggr_bed %>% dplyr::filter(group == "high medium") %>%
-  dplyr::select(seqname, start_position, end_position) %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(.,
             glue("{result_folder}NT_highmedium.bed"),
             col_names = FALSE)
 aggr_bed %>% dplyr::filter(group == "medium") %>%
-  dplyr::select(seqname, start_position, end_position) %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(., glue("{result_folder}NT_medium.bed"), col_names = FALSE)
 aggr_bed %>% dplyr::filter(group == "low medium") %>%
-  dplyr::select(seqname, start_position, end_position) %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(.,
             glue("{result_folder}NT_lowmedium.bed"),
             col_names = FALSE)
 aggr_bed %>% dplyr::filter(group == "low") %>%
-  dplyr::select(seqname, start_position, end_position) %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(., glue("{result_folder}NT_low.bed"), col_names = FALSE)
 
 order = factor(aggr$group, levels = c("high", "high medium", "low medium", "low"))

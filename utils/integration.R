@@ -884,7 +884,7 @@ create_heatmaps = function(path_to_boundaries,
     rect_gp = gpar(col = "black", lwd = 0.1),
     show_column_dend = FALSE,
     cluster_columns = TRUE,
-    cluster_rows = TRUE,
+    cluster_rows = FALSE,
     show_row_dend = TRUE,
     heatmap_width = unit(4, "cm"),
     heatmap_height = unit(12, "cm"),
@@ -916,9 +916,9 @@ create_heatmaps = function(path_to_boundaries,
     rect_gp = gpar(col = "black", lwd = 0.1),
     show_column_dend = FALSE,
     cluster_columns = FALSE,
-    cluster_rows = FALSE,
-    show_row_dend = FALSE,
-    heatmap_width = unit(0.5, "cm"),
+    cluster_rows = TRUE,
+    show_row_dend = TRUE,
+    heatmap_width = unit(2.5, "cm"),
     heatmap_height = unit(12, "cm"),
     show_row_names = FALSE,
     column_names_gp = gpar(fontsize = 7),
@@ -958,10 +958,10 @@ create_heatmaps = function(path_to_boundaries,
     column_names_rot = 90,
   )
   
-  hm_list = norm_hm + hm_fc + hm_ins
+  hm_list = hm_fc + norm_hm + hm_ins
   pdf(
     file = glue("{result_folder}{output_name}"),
-    width = 4,
+    width = 5,
     height = 5.5
   )
   suppressWarnings(draw(hm_list, auto_adjust = FALSE))
