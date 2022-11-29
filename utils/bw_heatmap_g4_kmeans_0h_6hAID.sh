@@ -18,6 +18,7 @@ computeMatrix reference-point -o ../results/deeptools/matrix_g4_kmeans_0h6h_AID.
  ../data/CutNTag/bw/G4_6h_AID_5million.norm.bw \
  ../data/CutNTag/bw/G4_24h_AID_5million.norm.bw \
  -R ../data/CutNTag/bed/G4_WT_peaks.narrowPeak \
+ --referencePoint center \
  -b 3000 -a 3000 --samplesLabel "CTCF 0h AID" "CTCF 6h AID" "G4 0h AID" "G4 6h AID" "G4 24h AID" \
  --outFileNameMatrix ../results/deeptools/matrix_g4_kmeans_0h6h_AID.tsv \
  --outFileSortedRegions ../results/deeptools/matrix_g4_kmeans_0h6h_AID_sorted_regions.tsv \

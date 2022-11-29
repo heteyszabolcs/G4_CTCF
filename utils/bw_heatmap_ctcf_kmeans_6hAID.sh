@@ -10,11 +10,12 @@ module load bioinfo-tools
 module load deepTools
 
 cd /proj/snic2020-6-3/SZABOLCS/HiC_G4s/utils
-# computeMatrix reference-point -o ../results/deeptools/matrix_ctcf_kmeans_6hAID.mat.gz \
- # -S ../data/CutNTag/bw/G4_6h_AID_merge.bw \
- # -R ../data/CutNTag/bed/CTCF_AID_0h_2_norm.bed \
- # -b 3000 -a 3000 --samplesLabel "G4 6h AID"  \
- # --skipZeros --missingDataAsZero
+computeMatrix reference-point -o ../results/deeptools/matrix_ctcf_kmeans_6hAID.mat.gz \
+ -S ../data/CutNTag/bw/G4_6h_AID_merge.bw \
+ -R ../data/CutNTag/bed/CTCF_AID_0h_2_norm.bed \
+ --referencePoint center \
+ -b 3000 -a 3000 --samplesLabel "G4 6h AID"  \
+ --skipZeros --missingDataAsZero
 
 plotHeatmap -m ../results/deeptools/matrix_ctcf_kmeans_6hAID.mat.gz \
  -out "../results/deeptools/CTCF_kmeans_6H_AID.pdf" \

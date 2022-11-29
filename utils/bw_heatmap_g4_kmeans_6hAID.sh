@@ -11,11 +11,12 @@ module load deepTools
 
 cd /proj/snic2020-6-3/SZABOLCS/HiC_G4s/utils
 
-# computeMatrix reference-point -o ../results/deeptools/matrix_g4_kmeans_6hAID.mat.gz \
- # -S ../data/CutNTag/bw/CTCF_6h_AID_merge.bw \
- # -R ../data/CutNTag/bed/G4_WT_peaks.bed \
- # -b 3000 -a 3000 --samplesLabel "CTCF 6h AID"  \
- # --skipZeros --missingDataAsZero
+computeMatrix reference-point -o ../results/deeptools/matrix_g4_kmeans_6hAID.mat.gz \
+ -S ../data/CutNTag/bw/CTCF_6h_AID_merge.bw \
+ -R ../data/CutNTag/bed/G4_WT_peaks.bed \
+ --referencePoint center \
+ -b 3000 -a 3000 --samplesLabel "CTCF 6h AID"  \
+ --skipZeros --missingDataAsZero
 
 plotHeatmap -m ../results/deeptools/matrix_g4_kmeans_6hAID.mat.gz \
  -out "../results/deeptools/G4_kmeans_6H_AID.pdf" \
