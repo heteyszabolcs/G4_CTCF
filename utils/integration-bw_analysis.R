@@ -48,7 +48,7 @@ create_volc = function(bw_comp_output1,
   joined_filt = joined %>% dplyr::filter(
     fold_change_1 > fc_filter1 &
       fold_change_2 > fc_filter2 &
-      abs(distanceToTSS_1) < distance_filter & abs(distanceToTSS_2)
+      abs(distanceToTSS_1) < distance_filter & abs(distanceToTSS_2) < distance_filter
   ) %>%
     left_join(., fc, by = c("gene_symbol" = "gene_name"))
 
