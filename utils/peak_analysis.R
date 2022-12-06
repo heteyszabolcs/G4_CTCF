@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library("GenomicRanges")
   library("ggpubr")
   library("ggrastr")
+  library("plyr")
   library("ComplexHeatmap")
   library("EnsDb.Mmusculus.v79")
   library("topGO")
@@ -73,8 +74,8 @@ create_top_scatter = function(bigwig1 = glue("{bigwigs}CTCF_0h_AID_merge.bw"),
   return(print(sc))
 }
 
-ctcf_1 = fread(glue("{peaks}CTCF_AID_0h_1_norm.narrowPeak"))
-ctcf_2 = fread(glue("{peaks}CTCF_AID_0h_2_norm.narrowPeak"))
+ctcf_1 = fread(glue("{peaks}CTCF_AID_0h_downsampled_peaks.narrowPeak"))
+#ctcf_2 = fread(glue("{peaks}CTCF_AID_0h_2_norm.narrowPeak"))
 top_ctcf = get_tops(ctcf_1)
 
 hic_bed = fread("../data/Hi-C/bed/NT_fastq_merge_bd_200kb_noheader.bed")
@@ -179,6 +180,7 @@ bp = rbind(G4_CTCF_annot, CTCF_noG4_annot, G4_noCTCF) %>%
   dplyr::select(norm_expr, peakset) %>%
   drop_na()
 order = factor(bp$peakset, levels = c("CTCF only", "G4-CTCF", "G4 only"))
+meds = ddply(bp, .(peakset), summarise, med = median(norm_expr))
 
 ggplot(bp,
        aes(x = order, y = norm_expr)) +
@@ -209,7 +211,9 @@ ggplot(bp,
     ref.group = ".all.",
     label.y = 17,
     size = 10
-  )
+  ) +
+  geom_text(data = meds, aes(x = peakset, y = 5, label = round(med, 1)), 
+            size = 10, vjust = -1.5)
 
 ggsave(
   plot = last_plot(),
@@ -247,7 +251,6 @@ create_input = function(all, sign) {
   
   return(input)
 }
-
 
 ## topGO analysis
 # create topGO output
@@ -324,5 +327,12 @@ hm = Heatmap(
   column_names_rot = 90
 )
 hm
+pdf(
+  file = glue("{result_folder}topGO_on_peaksets.pdf"),
+  width = 5,
+  height = 5
+)
+print(hm)
+dev.off()
 
   

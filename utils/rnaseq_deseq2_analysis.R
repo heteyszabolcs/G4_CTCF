@@ -17,7 +17,7 @@ suppressPackageStartupMessages({
 result_folder = "../results/rna_seq_deseq2/"
 
 # prepare tables
-counts = fread("../data/RNA-Seq/nextflow_output/star_rsem/rsem.merged.transcript_counts.tsv")
+counts = fread("../data/RNA-Seq/mESC_bulk_RNASeq_TMPyP4_study/star_rsem/rsem.merged.transcript_counts.tsv")
 counts = counts %>% group_by(gene_id) %>% summarise_all(mean) %>% dplyr::select(-transcript_id)
 counts = counts %>%
   mutate_if(is.numeric, round)
@@ -147,26 +147,49 @@ aggr_bed %>% dplyr::filter(group == "high") %>%
   dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
   mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(., glue("{result_folder}NT_high.bed"), col_names = FALSE)
+
+add_upstream = aggr_bed %>% dplyr::filter(group == "high") %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
+  mutate(start_position = start_position - 500) %>% 
+  write_tsv(., glue("{result_folder}NT_high_500bp_upstream.bed"), col_names = FALSE)
+
 aggr_bed %>% dplyr::filter(group == "high medium") %>%
   dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
   mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(.,
             glue("{result_folder}NT_highmedium.bed"),
             col_names = FALSE)
-aggr_bed %>% dplyr::filter(group == "medium") %>%
+
+add_upstream = aggr_bed %>% dplyr::filter(group == "high medium") %>%
   dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
   mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
-  write_tsv(., glue("{result_folder}NT_medium.bed"), col_names = FALSE)
+  mutate(start_position = start_position - 500) %>% 
+  write_tsv(., glue("{result_folder}NT_highmedium_500bp_upstream.bed"), col_names = FALSE)
+
 aggr_bed %>% dplyr::filter(group == "low medium") %>%
   dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
   mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(.,
             glue("{result_folder}NT_lowmedium.bed"),
             col_names = FALSE)
+
+add_upstream = aggr_bed %>% dplyr::filter(group == "low medium") %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
+  mutate(start_position = start_position - 500) %>% 
+  write_tsv(., glue("{result_folder}NT_lowmedium_500bp_upstream.bed"), col_names = FALSE)
+
 aggr_bed %>% dplyr::filter(group == "low") %>%
   dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
   mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
   write_tsv(., glue("{result_folder}NT_low.bed"), col_names = FALSE)
+
+add_upstream = aggr_bed %>% dplyr::filter(group == "low") %>%
+  dplyr::select(seqname, start_position, end_position, gene_symbol, score, strand) %>%
+  mutate(strand = ifelse(strand == -1, "-", "+")) %>% 
+  mutate(start_position = start_position - 500) %>% 
+  write_tsv(., glue("{result_folder}NT_low_500bp_upstream.bed"), col_names = FALSE)
 
 order = factor(aggr$group, levels = c("high", "high medium", "low medium", "low"))
 ggplot(aggr, aes(x = order, y = NT, fill = group)) +

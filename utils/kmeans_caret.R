@@ -27,7 +27,6 @@ vst = fread(vst)
 fc = fread("../results/rna_seq_deseq2/RNA-Seq_treat_vs_contr_DESeq2_fc.tsv")
 sign = fc %>% filter(abs(log2FoldChange) > 0.25) %>% pull(gene_name)
 
-
 create_ins_fc_summary = function(annot_bound_path, k = 3, type = "common") {
   
   boundary_data = fread(annot_bound_path)
