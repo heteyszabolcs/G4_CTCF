@@ -6,7 +6,12 @@ suppressPackageStartupMessages({
   library("glue")
   library("ggrepel")
   library("ggpubr")
+  library("DGEobj.utils")
+  library("ggsignif")
 })
+
+# turning off scientific notation
+options(scipen=999)
 
 # call annotation function
 source("C:/Szabolcs/Karolinska/Data/scripts/annotation.R")
@@ -14,11 +19,22 @@ source("C:/Szabolcs/Karolinska/Data/scripts/annotation.R")
 # result folder
 result_folder = "../results/rna_seq_deseq2/"
 # peak folder
-cnt_folder = "../data/CutNTag/bed/"
+cnt_folder = "../data/CutNTag_ChIP-Seq/bed/"
 hic_folder = "../data/Hi-C/"
+proseq_folder = "../data/PRO-Seq/"
 # RNA-Seq data
 deseq2 = "../results/rna_seq_deseq2/reg_log_norm_counts-full-20230227.tsv"
 fc = fread(glue("{result_folder}RNA-Seq_treat_vs_contr_DESeq2_fc_full-20230227.tsv"))
+
+# PRO-Seq data (GSE130691)
+pro = fread(glue("{proseq_folder}GSE130691_mESC.featureCounts.txt"))
+pro = pro %>% dplyr::select(-Chr, -Start, -End)
+pro_rc = pro %>% dplyr::select(starts_with("mESC")) %>% as.matrix
+pro_tpm = as_tibble(convertCounts(pro_rc, unit = "TPM", geneLength = pro$Length, normalize = "none"))
+pro_tpm = pro_tpm %>% mutate(gene_symbol = pro$Geneid, strand = pro$Strand) %>% 
+  mutate(., TPM_mean = rowMeans(dplyr::select(., starts_with("mESC")), na.rm = TRUE)) %>% 
+  dplyr::select(gene_symbol, strand, starts_with("mESC"), TPM_mean) %>% 
+  mutate(strand = ifelse(str_detect(pattern = "\\+", string = strand), "+", "-"))
 
 # essential genes (Shahar et al., 2019) - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6836742/
 ess = fread("../data/Shahar_et_al_2019-CRISPR_score_mESC_essentiality.tsv")
@@ -27,9 +43,9 @@ ess_genes = ess %>% dplyr::filter(`Fold change day 18` <= -2 &
   pull(`Gene name`)
 
 # promoters
-CTCF_G4_common = fread(glue("{cnt_folder}promoters_CTCF_G4_common.bed"))
-G4_no_CTCF = fread(glue("{cnt_folder}promoters_G4_no_CTCF.bed"))
-CTCF_no_G4 = fread(glue("{cnt_folder}promoters_CTCF_no_G4.bed"))
+CTCF_G4_common = fread(glue("{cnt_folder}CTCF_G4_common_WT_with_promoters_missingaszero_skipzero.ordered.regions.bed"))
+G4_no_CTCF = fread(glue("{cnt_folder}G4_no_CTCF_WT_with_promoters_missingaszero_skipzero.ordered.regions.bed"))
+CTCF_no_G4 = fread(glue("{cnt_folder}CTCF_no_G4_WT_with_promoters_missingaszero_skipzero.ordered.regions.bed"))
 
 # enhancer-promoter interactions (Bonev 2017)
 enh_prom = fread(glue(
@@ -253,6 +269,104 @@ bp = ggplot(norm_expr_proms, aes(x = promoter_set, y = expr, fill = condition)) 
     axis.text.y = element_text(size = 12, color = "black")
   )
 bp
+
+CTCF_G4_common_annot = annotate_promoters(CTCF_G4_common)
+CTCF_G4_common_annot = CTCF_G4_common_annot %>% inner_join(., pro_tpm, by = c("gene" = "gene_symbol")) %>%
+  distinct(gene, .keep_all = TRUE) %>% mutate(promoter_set = "CTCF & G4") %>% 
+  dplyr::select("gene", "strand", "TPM_mean", "promoter_set")
+
+CTCF_no_G4_annot = annotate_promoters(CTCF_no_G4)
+CTCF_no_G4_annot = CTCF_no_G4_annot %>% inner_join(., pro_tpm, by = c("gene" = "gene_symbol")) %>%
+  distinct(gene, .keep_all = TRUE) %>% mutate(promoter_set = "CTCF only") %>% 
+  dplyr::select("gene", "strand", "TPM_mean", "promoter_set")
+
+G4_no_CTCF_annot = annotate_promoters(G4_no_CTCF)
+G4_no_CTCF_annot = G4_no_CTCF_annot %>% inner_join(., pro_tpm, by = c("gene" = "gene_symbol")) %>%
+  distinct(gene, .keep_all = TRUE) %>% mutate(promoter_set = "G4 only") %>% 
+  dplyr::select("gene", "strand", "TPM_mean", "promoter_set")
+
+double_neg_proms = tibble(genes_without_G4_CTCF = double_neg_proms) %>% 
+  inner_join(., pro_tpm, by = c("genes_without_G4_CTCF" = "gene_symbol")) %>%
+  distinct(genes_without_G4_CTCF, .keep_all = TRUE) %>% mutate(promoter_set = "w/o CTCF, w/o G4") %>% 
+  dplyr::select("gene" = "genes_without_G4_CTCF", "strand", "TPM_mean", "promoter_set")
+
+proseq_proms = bind_rows(CTCF_G4_common_annot, CTCF_no_G4_annot, G4_no_CTCF_annot, double_neg_proms)
+
+my_comparisons <- list( c("w/o CTCF, w/o G4", "CTCF only"), c("w/o CTCF, w/o G4", "CTCF & G4"), 
+                        c("w/o CTCF, w/o G4", "G4 only") )
+pro_bp = ggplot(proseq_proms, aes(x = promoter_set, y = TPM_mean)) +
+  geom_boxplot(fill = "#feb24c") +
+  ylim(0, 1300) +
+  labs(title = "PRO-Seq output of promoter subsets",
+       x = "promoter set",
+       y = "TPM",
+       fill = "sample") +
+  theme_classic() +
+  theme(
+    text = element_text(size = 15),
+    plot.title = element_text(size = 15),
+    axis.text.x = element_text(size = 12, color = "black"),
+    axis.text.y = element_text(size = 12, color = "black")
+  ) +
+  stat_compare_means(label = "p.signif", method = "t.test",
+                     ref.group = "w/o CTCF, w/o G4", label.y = 1250, size = 9)
+
+pro_bp
+
+
+
+# export
+ggsave(
+  plot = pro_bp,
+  glue("{result_folder}PRO-Seq_CTCF_G4_promoters.pdf"),
+  width = 8,
+  height = 6,
+  device = "pdf"
+)
+
+ggsave(
+  plot = pro_bp,
+  glue("{result_folder}PRO-Seq_CTCF_G4_promoters.png"),
+  width = 8,
+  height = 6
+)
+
+stat_df = compare_means(TPM_mean ~ strand, group.by = "promoter_set", data = proseq_proms, p.adjust.method = "holm") %>%
+  mutate(y_pos = 20, p.adj = format.pval(p.adj, digits = 2))
+
+strandspec_pro_bp = ggplot(proseq_proms, aes(x = promoter_set, y = TPM_mean, fill = strand)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("#fc9272", "#9ecae1")) +
+  ylim(0, 1300) +
+  labs(title = "PRO-Seq output of promoter subsets",
+       x = "promoter set",
+       y = "TPM",
+       fill = "sample") +
+  theme_classic() +
+  theme(
+    text = element_text(size = 15),
+    plot.title = element_text(size = 15),
+    axis.text.x = element_text(size = 12, color = "black"),
+    axis.text.y = element_text(size = 12, color = "black")
+  )
+strandspec_pro_bp
+
+# export
+ggsave(
+  plot = strandspec_pro_bp,
+  glue("{result_folder}PRO-Seq_strand-CTCF_G4_promoters.pdf"),
+  width = 8,
+  height = 6,
+  device = "pdf"
+)
+
+ggsave(
+  plot = strandspec_pro_bp,
+  glue("{result_folder}PRO-Seq_strand-CTCF_G4_promoters.png"),
+  width = 8,
+  height = 6
+)
+
 
 tmpyp4_expr_proms = norm_expr_proms %>% dplyr::filter(str_detect(condition, "TMP")) %>% 
   group_by(promoter_set, gene) %>% summarise(expr = mean(expr))
