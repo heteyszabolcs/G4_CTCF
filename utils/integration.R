@@ -32,7 +32,7 @@ vst = "../results/rna_seq_deseq2/vst_norm_counts.tsv"
 deseq2 = fread(deseq2)
 vst = fread(vst)
 
-fc = fread("../results/rna_seq_deseq2/RNA-Seq_treat_vs_contr_DESeq2_fc.tsv")
+fc = fread("../results/rna_seq_deseq2/RNA-Seq_treat_vs_contr_DESeq2_fc-20230227.tsv")
 sign = fc %>% filter(abs(log2FoldChange) > 0.25) %>% pull(gene_name)
 
 # function: join together the two TAD data frames and assigns DESeq2 norm. expression levels to the annotated genes
@@ -53,13 +53,13 @@ add_expr_feature = function(tad_annot, tad, expression) {
   )
   
   joined = bed1 %>% left_join(., bed2, by = c("starts" = "end", "seqnames" = "seqnames")) %>%
-    select(seqnames,
+    dplyr::select(seqnames,
            starts,
            ends,
            gene_symbol,
            TAD_start_log2_ins_score = log2_insulation_score_200000) %>%
     left_join(., bed2, by = c("ends" = "start", "seqnames" = "seqnames")) %>%
-    select(
+    dplyr::select(
       seqnames,
       starts,
       ends,
@@ -68,7 +68,7 @@ add_expr_feature = function(tad_annot, tad, expression) {
       TAD_end_log2_ins_score = log2_insulation_score_200000
     )
   
-  joined_to_expr = joined %>% inner_join(., deseq2, on = "gene_symbol")
+  joined_to_expr = joined %>% inner_join(., deseq2, by = "gene_symbol")
   
   return(joined_to_expr)
   
@@ -89,7 +89,7 @@ common_long = pivot_longer(
   names_to = "ins_score_type",
   values_to = "log2_ins_score"
 )
-common_long = common_long %>% drop_na() %>% select(-seqnames,-starts,-ends)
+common_long = common_long %>% drop_na() %>% dplyr::select(-seqnames,-starts,-ends)
 
 # expression VS. insulation score
 common_plot = ggplot(common_long, aes(x = NT_1, y = log2_ins_score)) +
@@ -156,7 +156,7 @@ common_plot2
 # insulation score vs. log2 fold change
 
 common_fc = common %>% inner_join(., fc, by = c("gene_symbol" = "gene_name")) %>% 
-  select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
+  dplyr::select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
 
 common_fc = pivot_longer(
   common_fc,
@@ -232,7 +232,7 @@ nt_long = pivot_longer(
   names_to = "ins_score_type",
   values_to = "log2_ins_score"
 )
-nt_long = nt_long %>% drop_na() %>% select(-seqnames,-starts,-ends)
+nt_long = nt_long %>% drop_na() %>% dplyr::select(-seqnames,-starts,-ends)
 
 nt_plot = ggplot(nt_long, aes(x = NT_1, y = log2_ins_score)) +
   geom_point(size = 2, aes(colour = ins_score_type)) +
@@ -297,7 +297,7 @@ nt_plot2
 # insulation score vs. log2 fold change
 
 nt_fc = nt %>% inner_join(., fc, by = c("gene_symbol" = "gene_name")) %>% 
-  select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
+  dplyr::select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
 
 nt_fc = pivot_longer(
   nt_fc,
@@ -371,7 +371,7 @@ nt_only_long = pivot_longer(
   names_to = "ins_score_type",
   values_to = "log2_ins_score"
 )
-nt_only_long = nt_only_long %>% drop_na() %>% select(-seqnames,-starts,-ends)
+nt_only_long = nt_only_long %>% drop_na() %>% dplyr::select(-seqnames,-starts,-ends)
 
 nt_only_plot = ggplot(nt_only_long, aes(x = NT_1, y = log2_ins_score)) +
   geom_point(size = 2, aes(colour = ins_score_type)) +
@@ -435,7 +435,7 @@ nt_only_plot2
 
 # insulation score vs. log2 fold change
 nt_only_fc = nt_only %>% inner_join(., fc, by = c("gene_symbol" = "gene_name")) %>% 
-  select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
+  dplyr::select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
 
 nt_only_fc = pivot_longer(
   nt_only_fc,
@@ -509,7 +509,7 @@ TMPyP4_long = pivot_longer(
   names_to = "ins_score_type",
   values_to = "log2_ins_score"
 )
-TMPyP4_long = TMPyP4_long %>% drop_na() %>% select(-seqnames,-starts,-ends)
+TMPyP4_long = TMPyP4_long %>% drop_na() %>% dplyr::select(-seqnames,-starts,-ends)
 
 TMPyP4_plot = ggplot(TMPyP4_long, aes(x = NT_1, y = log2_ins_score)) +
   geom_point(size = 2, aes(colour = ins_score_type)) +
@@ -573,7 +573,7 @@ TMPyP4_plot2
 
 # insulation score vs. log2 fold change
 TMPyP4_fc = TMPyP4 %>% inner_join(., fc, by = c("gene_symbol" = "gene_name")) %>% 
-  select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
+  dplyr::select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
 
 TMPyP4_fc = pivot_longer(
   TMPyP4_fc,
@@ -647,7 +647,7 @@ TMPyP4_only_long = pivot_longer(
   names_to = "ins_score_type",
   values_to = "log2_ins_score"
 )
-TMPyP4_only_long = TMPyP4_only_long %>% drop_na() %>% select(-seqnames,-starts,-ends)
+TMPyP4_only_long = TMPyP4_only_long %>% drop_na() %>% dplyr::select(-seqnames,-starts,-ends)
 
 TMPyP4_only_plot = ggplot(TMPyP4_only_long, aes(x = NT_1, y = log2_ins_score)) +
   geom_point(size = 2, aes(colour = ins_score_type)) +
@@ -711,7 +711,7 @@ TMPyP4_only_plot2
 
 # insulation score vs. log2 fold change
 TMPyP4_only_fc = TMPyP4_only %>% inner_join(., fc, by = c("gene_symbol" = "gene_name")) %>% 
-  select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
+  dplyr::select(gene_symbol, TAD_start_log2_ins_score, TAD_end_log2_ins_score, log2FoldChange, padj)
 
 TMPyP4_only_fc = pivot_longer(
   TMPyP4_only_fc,

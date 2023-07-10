@@ -15,12 +15,12 @@ result_folder = "../results/rna_seq_deseq2/"
 rna1 = fread(glue("{rnaseq_data}mESC_bulk_RNASeq_20151023/star_rsem/wildtype_mESC_1.genes.results"))
 rna2 = fread(glue("{rnaseq_data}mESC_bulk_RNASeq_20151023/star_rsem/wildtype_mESC_2.genes.results"))
 rna2015 = rna1 %>% inner_join(., rna2, by = "gene_id") %>% dplyr::select(gene_id, TPM.x, TPM.y) %>% 
-  mutate(., TPM_mean = rowMeans(select(., TPM.x:TPM.y), na.rm = TRUE)) %>% dplyr::select(gene_id, TPM_mean) %>% 
+  mutate(., TPM_mean = rowMeans(dplyr::select(., TPM.x:TPM.y), na.rm = TRUE)) %>% dplyr::select(gene_id, TPM_mean) %>% 
   dplyr::filter(TPM_mean < 7500)
 
-rna_tmpyp4 = fread(glue("{rnaseq_data}mESC_bulk_RNASeq_TMPyP4_study/star_rsem/rsem.merged.gene_tpm.tsv"))
-rna_tmpyp4 = rna_tmpyp4 %>% mutate(., TPM_non_trt_mean = rowMeans(select(., c(NT_1, NT_2)), na.rm = TRUE)) %>% 
-  mutate(., TPM_TMPyP4_mean = rowMeans(select(., c(TMPyP4_1, TMPyP4_2)), na.rm = TRUE)) %>% dplyr::select(gene_id, ends_with("mean")) %>% 
+rna_tmpyp4 = fread(glue("{rnaseq_data}mESC_bulk_RNASeq_TMPyP4_study_20230227_WT/star_rsem/rsem.merged.gene_tpm.tsv"))
+rna_tmpyp4 = rna_tmpyp4 %>% mutate(., TPM_non_trt_mean = rowMeans(dplyr::select(., c(NT_1, NT_2)), na.rm = TRUE)) %>% 
+  mutate(., TPM_TMPyP4_mean = rowMeans(dplyr::select(., c(TMPyP4_1, TMPyP4_2)), na.rm = TRUE)) %>% dplyr::select(gene_id, ends_with("mean")) %>% 
   dplyr::filter(TPM_TMPyP4_mean < 7500)
 
 rna_all = rna_tmpyp4 %>% inner_join(., rna2015, by = c("gene_id"))
